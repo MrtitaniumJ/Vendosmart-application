@@ -1,0 +1,7 @@
+Category,Sub Category 1,Sub Category 2,Item Code,Description,Quantity,Estimated Rate,Supplier 1 (Rate),Supplier 2 (Rate),Supplier 3 (Rate),Supplier 4 (Rate),Supplier 5 (Rate)
+Aerospace Parts,Structural,Support strut for seat mounting,ITEM-1234,Aerospace parts flying,20,40.00,35.64,40.12,40.73,41.02,36.84
+Aerospace Parts,Structural,Support strut for seat mounting,ITEM-1235,Aerospace parts flying,10,20.00,17.82,20.06,20.36,20.51,18.42
+Aerospace Parts,Brackets,Support strut for seat mounting,ITEM-1236,Aerospace parts flying,30,10.00,8.91,10.03,10.18,10.26,9.21
+Aerospace Parts,Brackets,Support strut for seat mounting,ITEM-1237,Aerospace parts flying,40,70.00,62.37,70.22,71.27,71.78,64.47
+Precision Components,Fasteners,Titanium aerospace bolt,ITEM-2122,Aerospace parts flying,30,50.00,44.37,53.00,50.98,51.28,48.10
+Precision Components,Fasteners,Titanium aerospace bolt,ITEM-2123,Aerospace parts flying,40,21.00,18.64,22.26,21.41,21.54,20.20
