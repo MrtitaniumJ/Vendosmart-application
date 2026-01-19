@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -40,6 +40,33 @@ export function BomTable({ data }: BomTableProps) {
   });
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [isTreeView, setIsTreeView] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<number[]>([]);
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  // Measure column widths for sticky positioning
+  useEffect(() => {
+    if (!tableRef.current) return;
+
+    const updateWidths = () => {
+      if (!tableRef.current) return;
+      const headerCells = tableRef.current.querySelectorAll("thead tr:first-child th");
+      const widths = Array.from(headerCells).map((cell) => (cell as HTMLElement).offsetWidth);
+      setColumnWidths(widths);
+    };
+
+    // Initial measurement
+    updateWidths();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateWidths();
+    });
+
+    resizeObserver.observe(tableRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   // Build tree structure from flat data
   const treeData = useMemo(() => {
@@ -361,21 +388,19 @@ export function BomTable({ data }: BomTableProps) {
 
   const freezeColumnIndex = useMemo(() => {
     if (!freezeColumnId) return -1;
-    const allColumns = table.getAllColumns();
-    return allColumns.findIndex((col) => col.id === freezeColumnId);
-  }, [freezeColumnId, table]);
+    const visibleColumns = table.getVisibleFlatColumns();
+    return visibleColumns.findIndex((col) => col.id === freezeColumnId);
+  }, [freezeColumnId, table.getVisibleFlatColumns()]);
 
   const getColumnLeftOffset = (columnIndex: number): number => {
     if (freezeColumnIndex === -1 || columnIndex >= freezeColumnIndex) {
       return 0;
     }
 
-    // Calculate accumulated width of frozen columns
-    const headerCells = document.querySelectorAll("thead th");
+    // Use stored column widths from state
     let offset = 0;
-    for (let i = 0; i < columnIndex && i < headerCells.length; i++) {
-      const cell = headerCells[i] as HTMLElement;
-      offset += cell.offsetWidth;
+    for (let i = 0; i < columnIndex && i < columnWidths.length; i++) {
+      offset += columnWidths[i];
     }
     return offset;
   };
@@ -610,7 +635,7 @@ export function BomTable({ data }: BomTableProps) {
           </div>
         </div>
         <div className={`scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 ${showTreeView ? 'overflow-auto max-h-[calc(100vh-200px)] sm:max-h-[calc(100vh-250px)] rounded-b-lg' : 'overflow-x-auto -mx-1 sm:mx-0'}`}>
-          <table className="w-full border-separate border-spacing-0 min-w-full">
+          <table ref={tableRef} className="w-full border-separate border-spacing-0 min-w-full">
             <thead className="bg-slate-50 sticky top-0 z-20">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
@@ -667,9 +692,7 @@ export function BomTable({ data }: BomTableProps) {
                 return (
                   <tr key={row.id} className={`hover:bg-slate-50/50 transition-colors ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`}>
                     {row.getVisibleCells().map((cell, cellIdx) => {
-                      const columnId = cell.column.id;
-                      const allColumns = table.getAllColumns();
-                      const columnIndex = allColumns.findIndex((col) => col.id === columnId);
+                      const columnIndex = cellIdx;
                       const isFrozen = freezeColumnIndex !== -1 && columnIndex < freezeColumnIndex;
                       const leftOffset = isFrozen ? getColumnLeftOffset(columnIndex) : 0;
                       const isLastCell = cellIdx === row.getVisibleCells().length - 1;
