@@ -5,8 +5,12 @@ describe('csvValidation', () => {
   describe('validateHeaders', () => {
     it('should validate correct headers', () => {
       const headers = [
+        'Category',
+        'Sub Category 1',
+        'Sub Category 2',
         'Item Code',
         'Material',
+        'Description',
         'Quantity',
         'Estimated Rate',
         'Supplier 1 (Rate)',
@@ -30,8 +34,12 @@ describe('csvValidation', () => {
 
     it('should handle headers with extra whitespace', () => {
       const headers = [
+        ' Category ',
+        'Sub Category 1',
+        'Sub Category 2',
         ' Item Code ',
         'Material',
+        'Description',
         'Quantity',
         'Estimated Rate',
         'Supplier 1 (Rate)',

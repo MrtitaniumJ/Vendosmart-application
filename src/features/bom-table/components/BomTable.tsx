@@ -99,9 +99,11 @@ export function BomTable({ data }: BomTableProps) {
 
   // Check if we should show tree view (only if tree data exists and user toggled it)
   const showTreeView = isTreeView && treeData.length > 0 && treeData[0].level !== undefined;
-  
+
   // Check if we have hierarchical data (for table view with expand/collapse)
-  const hasHierarchicalData = treeData.length > 0 && treeData[0].level !== undefined;
+  const hasHierarchicalData = useMemo(() => {
+    return data.some(row => !!row.category || !!row.subCategory1 || !!row.subCategory2);
+  }, [data]);
 
   const columns = useMemo<ColumnDef<BomRow>[]>(
     () => {
@@ -125,10 +127,10 @@ export function BomTable({ data }: BomTableProps) {
             // For leaf nodes (items), show description or material name
             // For parent nodes (categories/subcategories), show the category/subcategory name (itemCode)
             const isLeafNode = !hasChildren;
-            const displayName = isLeafNode 
+            const displayName = isLeafNode
               ? (row.description || row.material || itemCode)
               : itemCode;
-            const secondaryText = isLeafNode && row.description && row.description !== itemCode
+            const secondaryText = isLeafNode && displayName !== itemCode
               ? itemCode
               : null;
 
@@ -578,7 +580,7 @@ export function BomTable({ data }: BomTableProps) {
                 <button
                   onClick={() => {
                     // Hide all supplier columns except first one
-                    const supplierColumns = columnDefinitions.filter(col => 
+                    const supplierColumns = columnDefinitions.filter(col =>
                       col.id.includes('Supplier') && col.id !== 'Supplier 1 (Rate)'
                     );
                     const newVisibility: VisibilityState = {};
@@ -677,7 +679,7 @@ export function BomTable({ data }: BomTableProps) {
                       const isSupplierColumn = SUPPLIER_KEYS.includes(cell.column.id as SupplierRateKey);
                       const rowData = row.original;
                       let cellBackgroundColor: string | undefined = undefined;
-                      
+
                       if (isSupplierColumn && !isFrozen) {
                         const supplierKey = cell.column.id as SupplierRateKey;
                         const supplierValue = rowData.suppliers[supplierKey];
@@ -723,7 +725,7 @@ export function BomTable({ data }: BomTableProps) {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination Controls - Only show in table view */}
         {!showTreeView && (
           <div className="bg-white border-t border-slate-200 px-3 sm:px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2">

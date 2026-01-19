@@ -108,7 +108,7 @@ export function calculateHeatmapColor(
 
   // Get all non-null supplier rates for this row
   const supplierRates = getSupplierRates(row);
-  
+
   // If no valid supplier rates, return default
   if (supplierRates.length === 0) {
     return {
@@ -121,12 +121,12 @@ export function calculateHeatmapColor(
   const rates = supplierRates.map(([, rate]) => rate);
   const minRate = Math.min(...rates);
   const maxRate = Math.max(...rates);
-  
+
   // If all rates are the same, use neutral yellow color
   if (minRate === maxRate) {
     return {
       backgroundColor: "#fef3c7", // amber-100 (light yellow)
-      textColor: "#000000",
+      textColor: "#92400e",
     };
   }
 
