@@ -423,7 +423,7 @@ export function BomTable({ data }: BomTableProps) {
             placeholder="Search..."
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="flex-1 min-w-0 px-3 py-2 sm:py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-slate-400 bg-white min-h-[44px] sm:min-h-0"
+            className="w-full sm:w-64 px-3 py-2 sm:py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-slate-400 bg-white min-h-[44px] sm:min-h-0"
           />
         </div>
 
