@@ -417,9 +417,9 @@ export function BomTable({ data }: BomTableProps) {
 
   return (
     <div className="animate-fade-in">
-      <div className="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-lg relative z-10">
+      <div className="border border-slate-200 rounded-lg bg-white shadow-lg relative z-10">
         {/* First row: Search bar (aligned left) */}
-        <div className="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex items-center gap-2">
+        <div className="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex items-center gap-2 rounded-t-lg">
           <input
             type="text"
             placeholder="Search..."
@@ -609,7 +609,7 @@ export function BomTable({ data }: BomTableProps) {
             </div>
           </div>
         </div>
-        <div className={`scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 ${showTreeView ? 'overflow-auto max-h-[calc(100vh-200px)] sm:max-h-[calc(100vh-250px)]' : 'overflow-x-auto -mx-1 sm:mx-0'}`}>
+        <div className={`scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 ${showTreeView ? 'overflow-auto max-h-[calc(100vh-200px)] sm:max-h-[calc(100vh-250px)] rounded-b-lg' : 'overflow-x-auto -mx-1 sm:mx-0'}`}>
           <table className="w-full border-separate border-spacing-0 min-w-full">
             <thead className="bg-slate-50 sticky top-0 z-20">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -728,7 +728,7 @@ export function BomTable({ data }: BomTableProps) {
 
         {/* Pagination Controls - Only show in table view */}
         {!showTreeView && (
-          <div className="bg-white border-t border-slate-200 px-3 sm:px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2">
+          <div className="bg-white border-t border-slate-200 px-3 sm:px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-2 rounded-b-lg">
             <div className="flex items-center gap-2 order-2 sm:order-1">
               <span className="text-xs sm:text-sm text-slate-700 whitespace-nowrap">
                 Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{" "}
