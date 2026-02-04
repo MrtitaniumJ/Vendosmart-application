@@ -10,5 +10,5 @@ createRoot(document.getElementById('root')!).render(
     <ToastProvider>
       <RouterProvider router={router} />
     </ToastProvider>
-  </StrictMode>,
+  </StrictMode>
 )

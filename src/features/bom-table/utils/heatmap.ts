@@ -5,6 +5,8 @@ export interface HeatmapColor {
   textColor: string;
 }
 
+export type HeatmapStrategy = "value" | "rank";
+
 /**
  * Gets all non-null supplier rates from a row
  * @param row - The BOM row to extract supplier rates from
@@ -77,26 +79,13 @@ function hslToRgb(h: number, s: number, l: number): string {
  * 
  * @param value - The supplier rate value to color (can be null)
  * @param row - The BOM row containing all supplier rates and estimated rate
+ * @param strategy - The coloring strategy to use ('value' or 'rank')
  * @returns HeatmapColor object with backgroundColor and textColor
- * 
- * @example
- * ```ts
- * const row: BomRow = {
- *   estimatedRate: 100,
- *   suppliers: {
- *     "Supplier 1 (Rate)": 90,  // Min - will be green
- *     "Supplier 2 (Rate)": 95,  // Intermediate - yellow-green
- *     "Supplier 3 (Rate)": 100, // Middle - yellow
- *     "Supplier 4 (Rate)": 105,  // Intermediate - yellow-red
- *     "Supplier 5 (Rate)": 110, // Max - will be red
- *   }
- * };
- * const color = calculateHeatmapColor(90, row); // Returns green color
- * ```
  */
 export function calculateHeatmapColor(
   value: number | null,
-  row: BomRow
+  row: BomRow,
+  strategy: HeatmapStrategy = "value"
 ): HeatmapColor {
   // Handle null or invalid values
   if (value === null) {
@@ -117,26 +106,51 @@ export function calculateHeatmapColor(
     };
   }
 
-  // Find min and max rates in this row
   const rates = supplierRates.map(([, rate]) => rate);
-  const minRate = Math.min(...rates);
-  const maxRate = Math.max(...rates);
 
-  // If all rates are the same, use neutral yellow color
-  if (minRate === maxRate) {
-    return {
-      backgroundColor: "#fef3c7", // amber-100 (light yellow)
-      textColor: "#92400e",
-    };
+  if (strategy === "rank") {
+    // Rank-based coloring
+    // Sort unique rates to determine rank
+    const uniqueRates = Array.from(new Set(rates)).sort((a, b) => a - b);
+    const rankIndex = uniqueRates.indexOf(value);
+
+    if (uniqueRates.length === 1) {
+      return {
+        backgroundColor: "#fef3c7", // amber-100 (light yellow)
+        textColor: "#92400e",
+      };
+    }
+
+    // 0 = Best (Green), 1 = Worst (Red)
+    // If only 2 ranks: 0 -> Green, 1 -> Red
+    // If 3 ranks: 0 -> Green, 0.5 -> Yellow, 1 -> Red
+    const rankPosition = rankIndex / (uniqueRates.length - 1);
+
+    return getColorFromPosition(rankPosition);
+  } else {
+    // Value-based coloring (Interpolation)
+    const minRate = Math.min(...rates);
+    const maxRate = Math.max(...rates);
+
+    // If all rates are the same, use neutral yellow color
+    if (minRate === maxRate) {
+      return {
+        backgroundColor: "#fef3c7", // amber-100 (light yellow)
+        textColor: "#92400e",
+      };
+    }
+
+    // Calculate position in the range (0 = min/green, 0.5 = middle/yellow, 1 = max/red)
+    const range = maxRate - minRate;
+    const position = range > 0 ? (value - minRate) / range : 0;
+
+    return getColorFromPosition(position);
   }
+}
 
-  // Calculate position in the range (0 = min/green, 0.5 = middle/yellow, 1 = max/red)
-  const range = maxRate - minRate;
-  const position = range > 0 ? (value - minRate) / range : 0;
-
+function getColorFromPosition(position: number): HeatmapColor {
   // Map position to HSL color space for smooth gradient
   // Green (120°) → Yellow (60°) → Red (0°)
-  // We use a smooth transition through the color wheel
   let hue: number;
   if (position <= 0.5) {
     // Green to Yellow: 120° → 60° (first half)
@@ -147,8 +161,8 @@ export function calculateHeatmapColor(
   }
 
   // Use high saturation and medium lightness for vibrant colors
-  const saturation = 85; // High saturation for vivid colors
-  const lightness = 75; // Medium lightness for good contrast with black text
+  const saturation = 85;
+  const lightness = 75;
 
   const backgroundColor = hslToRgb(hue, saturation, lightness);
   const textColor = "#000000"; // Black for maximum contrast

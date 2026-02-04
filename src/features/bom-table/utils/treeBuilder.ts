@@ -231,7 +231,7 @@ export function buildTreeFromBomData(data: BomRow[]): TreeNode[] {
           ...row,
           level: 3,
           isExpanded: false,
-          id: `item-${row.id || itemKey}`,
+          id: row.id || `item-${itemKey}`,
           children: [],
         };
         subCat2Node.children.push(itemNode);
@@ -241,7 +241,7 @@ export function buildTreeFromBomData(data: BomRow[]): TreeNode[] {
           ...row,
           level: 2,
           isExpanded: false,
-          id: `item-${row.id || itemKey}`,
+          id: row.id || `item-${itemKey}`,
           children: [],
         };
         subCat1Node.children.push(itemNode);
@@ -252,7 +252,7 @@ export function buildTreeFromBomData(data: BomRow[]): TreeNode[] {
         ...row,
         level: 1,
         isExpanded: false,
-        id: `item-${row.id || itemKey}`,
+        id: row.id || `item-${itemKey}`,
         children: [],
       };
       categoryNode.children.push(itemNode);

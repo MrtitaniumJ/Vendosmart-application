@@ -1,0 +1,168 @@
+
+> vendosmart@0.0.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90mD:/Off-Campus/Vendosmart[39m
+
+ [32mΓ£ô[39m src/features/bom-table/utils/heatmap.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [32mΓ£ô[39m src/lib/numbers.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32mΓ£ô[39m src/features/csv-import/utils/csvValidation.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+ [31mΓ¥»[39m src/features/bom-table/components/BomTable.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 180[2mms[22m[39m
+     [32mΓ£ô[39m should render empty state when no data[32m 32[2mms[22m[39m
+[31m     [31m├ù[31m should render table with data[39m[32m 145[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/features/bom-table/components/BomTable.test.tsx > BomTable > should render table with data
+TestingLibraryElementError: Unable to find an element with the text: ITEM-001. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="animate-fade-in"
+    >
+      <div
+        class="border border-slate-200 rounded-lg overflow-hidden bg-white shadow-lg relative z-10"
+      >
+        <div
+          class="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex items-center gap-2"
+        >
+          <input
+            class="w-full sm:w-64 px-3 py-2 sm:py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-slate-400 bg-white min-h-[44px] sm:min-h-0"
+            placeholder="Search..."
+            type="text"
+            value=""
+          />
+        </div>
+        <div
+          class="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex items-center justify-end gap-2 flex-wrap"
+        >
+          <button
+            aria-label="Switch to Tree View"
+            class="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
+            title="Switch to Tree View"
+          >
+            <svg
+              class="h-4 w-4 text-slate-700"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M19 9l-7 7-7-7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              />
+              <path
+                d="M19 15l-7 7-7-7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+              />
+            </svg>
+          </button>
+          <div
+            class="relative"
+          >
+            <button
+              aria-label="Show/Hide Columns"
+              class="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
+              title="Show/Hide Columns"
+            >
+              <svg
+                class="h-4 w-4 text-slate-700"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M4 6h6M4 10h6M4 14h6M14 6h6M14 10h6M14 14h6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <div
+              class="hidden absolute right-0 sm:right-0 left-auto sm:left-auto top-full mt-1 bg-white border border-slate-300 rounded shadow-lg z-50 min-w-[220px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-200px)] overflow-y-auto"
+              id="column-visibility-menu"
+            >
+              <div
+                class="p-2 max-h-96 overflow-y-auto"
+              >
+                <div
+                  class="px-3 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 bg-slate-50 mb-1"
+                >
+                  Show/Hide Columns
+                </div>
+                <label
+                  class="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <input
+                    checked=""
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+                    type="checkbox"
+                  />
+                  <span
+                    class="text-sm text-slate-700 font-medium"
+                  >
+                    Supplier 1
+                  </span>
+                </label>
+                <label
+                  class="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <input
+                    checked=""
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+                    type="checkbox"
+                  />
+                  <span
+                    class="text-sm text-slate-700 font-medium"
+                  >
+                    Supplier 2
+                  </span>
+                </label>
+                <label
+                  class="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <input
+                    checked=""
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+                    type="checkbox"
+                  />
+                  <span
+                    class="text-sm text-slate-700 font-medium"
+                  >
+                    Supplier 3
+                  </span>
+                </label>
+                <label
+                  class="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <input
+                    checked=""
+                    class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-ind...
+ Γ¥» Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ Γ¥» src/features/bom-table/components/BomTable.test.tsx:30:19
+     28|   it('should render table with data', () => {
+     29|     render(<BomTable data={sampleData} />);
+     30|     expect(screen.getByText('ITEM-001')).toBeInTheDocument();
+       |                   ^
+     31|     expect(screen.getByText('Steel')).toBeInTheDocument();
+     32|   });
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m16 passed[39m[22m[90m (17)[39m
+[2m   Start at [22m 12:17:16
+[2m   Duration [22m 3.40s[2m (transform 388ms, setup 1.45s, import 703ms, tests 235ms, environment 8.20s)[22m
+

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,8 +13,9 @@ import {
 } from "@tanstack/react-table";
 import type { BomRow, SupplierRateKey } from "../../../types/bom";
 import { formatCurrency } from "../../../lib/numbers";
-import { calculateHeatmapColor } from "../utils/heatmap";
+import { calculateHeatmapColor, type HeatmapStrategy } from "../utils/heatmap";
 import { HeatmapCell } from "./HeatmapCell";
+import { OptimizationSummary } from "./OptimizationSummary";
 import { buildTreeFromBomData, type TreeNode } from "../utils/treeBuilder";
 
 interface BomTableProps {
@@ -43,6 +44,57 @@ export function BomTable({ data }: BomTableProps) {
   const [columnWidths, setColumnWidths] = useState<number[]>([]);
   const tableRef = useRef<HTMLTableElement>(null);
 
+  // Sandbox & Advanced Features State
+  const [isSandboxMode, setIsSandboxMode] = useState(false);
+  const [heatmapStrategy, setHeatmapStrategy] = useState<HeatmapStrategy>("value");
+  const [showOptimization, setShowOptimization] = useState(false);
+  const [sandboxOverrides, setSandboxOverrides] = useState<Record<string, Partial<Record<SupplierRateKey, number>>>>({});
+
+  // Ensure every row has a stable ID for Sandbox tracking
+  const dataWithIds = useMemo(() => {
+    return data.map((row, index) => ({
+      ...row,
+      id: row.id || `row-${index}-${row.itemCode.replace(/\s+/g, '-')}`,
+    }));
+  }, [data]);
+
+  const effectiveData = useMemo(() => {
+
+    if (Object.keys(sandboxOverrides).length === 0) return dataWithIds;
+    const result = dataWithIds.map((row) => {
+      const rowId = row.id || "";
+      const rowOverrides = sandboxOverrides[rowId];
+      if (!rowOverrides) return row;
+      const updated = {
+        ...row,
+        suppliers: {
+          ...row.suppliers,
+          ...rowOverrides,
+        },
+      };
+
+      return updated;
+    });
+    return result;
+  }, [dataWithIds, sandboxOverrides]);
+
+  const originalDataMap = useMemo(() => {
+    return new Map(dataWithIds.map((r) => [r.id || "", r]));
+  }, [dataWithIds]);
+
+  const handleSandboxUpdate = useCallback((rowId: string, supplierKey: SupplierRateKey, value: number) => {
+    setSandboxOverrides((prev) => {
+      const updated = {
+        ...prev,
+        [rowId]: {
+          ...prev[rowId],
+          [supplierKey]: value,
+        },
+      };
+      return updated;
+    });
+  }, []);
+
   // Measure column widths for sticky positioning
   useEffect(() => {
     if (!tableRef.current) return;
@@ -70,9 +122,9 @@ export function BomTable({ data }: BomTableProps) {
 
   // Build tree structure from flat data
   const treeData = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    return buildTreeFromBomData(data);
-  }, [data]);
+    if (!effectiveData || effectiveData.length === 0) return [];
+    return buildTreeFromBomData(effectiveData);
+  }, [effectiveData]);
 
   // Auto-expand all categories and subcategories by default when tree view is enabled
   // In table view, start with all collapsed
@@ -129,8 +181,8 @@ export function BomTable({ data }: BomTableProps) {
 
   // Check if we have hierarchical data (for table view with expand/collapse)
   const hasHierarchicalData = useMemo(() => {
-    return data.some(row => !!row.category || !!row.subCategory1 || !!row.subCategory2);
-  }, [data]);
+    return effectiveData.some(row => !!row.category || !!row.subCategory1 || !!row.subCategory2);
+  }, [effectiveData]);
 
   const columns = useMemo<ColumnDef<BomRow>[]>(
     () => {
@@ -253,10 +305,17 @@ export function BomTable({ data }: BomTableProps) {
           header: supplierKey.replace(" (Rate)", ""),
           enableHiding: true,
           cell: (info: { row: { original: BomRow } }) => {
+            const rowId = info.row.original.id || "";
+            const currentValue = info.row.original.suppliers[supplierKey];
             return (
               <HeatmapCell
+                key={`${rowId}-${supplierKey}-${currentValue}`}
                 row={info.row.original}
                 supplierKey={supplierKey}
+                heatmapStrategy={heatmapStrategy}
+                isSandboxMode={isSandboxMode}
+                onUpdate={handleSandboxUpdate}
+                originalValue={originalDataMap.get(rowId)?.suppliers[supplierKey]}
               />
             );
           },
@@ -313,21 +372,41 @@ export function BomTable({ data }: BomTableProps) {
         },
       ];
     },
-    [showTreeView, hasHierarchicalData, expandedNodes]
+    [showTreeView, hasHierarchicalData, expandedNodes, heatmapStrategy, isSandboxMode, originalDataMap, handleSandboxUpdate]
   );
 
   // Use tree data if in tree view OR if we have hierarchical data in table view, otherwise use flat data
   const displayData = useMemo(() => {
+    let rows: BomRow[] = [];
     if (showTreeView) {
-      return flattenedData;
+      rows = flattenedData;
     } else if (hasHierarchicalData) {
       // Table view with hierarchical data: use flattened tree
-      return flattenedData;
+      rows = flattenedData;
     } else {
       // Table view without hierarchical data: use flat data
-      return data;
+      rows = effectiveData;
     }
-  }, [showTreeView, hasHierarchicalData, flattenedData, data]);
+
+    // Apply Sandbox Overrides to the final display data
+    // This is crucial for "Computed" rows (like Categories) which might be re-generated
+    // by treeBuilder on every render, invalidating the effectiveData pass for them.
+    if (Object.keys(sandboxOverrides).length === 0) return rows;
+
+    return rows.map(row => {
+      const rowId = row.id || "";
+      const rowOverrides = sandboxOverrides[rowId];
+      if (!rowOverrides) return row;
+
+      return {
+        ...row,
+        suppliers: {
+          ...row.suppliers,
+          ...rowOverrides
+        }
+      };
+    });
+  }, [showTreeView, hasHierarchicalData, flattenedData, effectiveData, sandboxOverrides]);
 
   const filteredData = useMemo(() => {
     if (!globalFilter) return displayData;
@@ -390,7 +469,7 @@ export function BomTable({ data }: BomTableProps) {
     if (!freezeColumnId) return -1;
     const visibleColumns = table.getVisibleFlatColumns();
     return visibleColumns.findIndex((col) => col.id === freezeColumnId);
-  }, [freezeColumnId, table.getVisibleFlatColumns()]);
+  }, [freezeColumnId, table]);
 
   const getColumnLeftOffset = (columnIndex: number): number => {
     if (freezeColumnIndex === -1 || columnIndex >= freezeColumnIndex) {
@@ -454,186 +533,243 @@ export function BomTable({ data }: BomTableProps) {
           />
         </div>
 
-        {/* Second row: Three icons (aligned right) */}
-        <div className="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex items-center justify-end gap-2 flex-wrap">
-          {/* First icon: Toggle between table view and tree view - Down in table view, Up in tree view */}
-          <button
-            onClick={() => setIsTreeView(!isTreeView)}
-            className="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
-            title={showTreeView ? "Switch to Table View" : "Switch to Tree View"}
-            aria-label={showTreeView ? "Switch to Table View" : "Switch to Tree View"}
-          >
-            {showTreeView ? (
-              // Tree view: Show upward chevrons
-              <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7" />
-              </svg>
-            ) : (
-              // Table view: Show downward chevrons
-              <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 15l-7 7-7-7" />
-              </svg>
-            )}
-          </button>
-          {/* Second icon: Show/Hide Columns - Always visible */}
-          <div className="relative">
+
+
+        {/* Second row: Controls and Icons */}
+        <div className="bg-white border-b border-slate-200 px-3 sm:px-4 py-2 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto no-scrollbar">
+            {/* Sandbox Mode Toggle */}
             <button
-              onClick={() => {
-                // Toggle column visibility menu
-                const menu = document.getElementById('column-visibility-menu');
-                if (menu) {
-                  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                }
-              }}
-              className="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
-              title="Show/Hide Columns"
-              aria-label="Show/Hide Columns"
+              onClick={() => setIsSandboxMode(!isSandboxMode)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${isSandboxMode
+                ? "bg-purple-100 text-purple-700 border border-purple-200 shadow-inner"
+                : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
+                }`}
             >
-              <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h6M4 10h6M4 14h6M14 6h6M14 10h6M14 14h6" />
-              </svg>
+              <div className={`w-2 h-2 rounded-full ${isSandboxMode ? "bg-purple-600 animate-pulse" : "bg-slate-400"}`} />
+              Sandbox Mode
             </button>
-            <div
-              id="column-visibility-menu"
-              className="hidden absolute right-0 sm:right-0 left-auto sm:left-auto top-full mt-1 bg-white border border-slate-300 rounded shadow-lg z-50 min-w-[220px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-200px)] overflow-y-auto"
+
+            {/* Heatmap Strategy Selector */}
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+              <button
+                onClick={() => setHeatmapStrategy("value")}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${heatmapStrategy === "value"
+                  ? "bg-white text-black shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                Value
+              </button>
+              <button
+                onClick={() => setHeatmapStrategy("rank")}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${heatmapStrategy === "rank"
+                  ? "bg-white text-black shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+                  }`}
+              >
+                Rank
+              </button>
+            </div>
+
+            {/* Optimization Toggle */}
+            <button
+              onClick={() => setShowOptimization(!showOptimization)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap border ${showOptimization
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                }`}
             >
-              <div className="p-2 max-h-96 overflow-y-auto">
-                <div className="px-3 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 bg-slate-50 mb-1">
-                  Show/Hide Columns
+              {showOptimization ? "Hide Optimization" : "Show Optimization"}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* First icon: Toggle between table view and tree view - Down in table view, Up in tree view */}
+            <button
+              onClick={() => setIsTreeView(!isTreeView)}
+              className="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
+              title={showTreeView ? "Switch to Table View" : "Switch to Tree View"}
+              aria-label={showTreeView ? "Switch to Table View" : "Switch to Tree View"}
+            >
+              {showTreeView ? (
+                // Tree view: Show upward chevrons
+                <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7" />
+                </svg>
+              ) : (
+                // Table view: Show downward chevrons
+                <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 15l-7 7-7-7" />
+                </svg>
+              )}
+            </button>
+            {/* Second icon: Show/Hide Columns - Always visible */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  // Toggle column visibility menu
+                  const menu = document.getElementById('column-visibility-menu');
+                  if (menu) {
+                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                  }
+                }}
+                className="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
+                title="Show/Hide Columns"
+                aria-label="Show/Hide Columns"
+              >
+                <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h6M4 10h6M4 14h6M14 6h6M14 10h6M14 14h6" />
+                </svg>
+              </button>
+              <div
+                id="column-visibility-menu"
+                className="hidden absolute right-0 sm:right-0 left-auto sm:left-auto top-full mt-1 bg-white border border-slate-300 rounded shadow-lg z-50 min-w-[220px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-200px)] overflow-y-auto"
+              >
+                <div className="p-2 max-h-96 overflow-y-auto">
+                  <div className="px-3 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 bg-slate-50 mb-1">
+                    Show/Hide Columns
+                  </div>
+                  {columnDefinitions.map((column) => (
+                    <label
+                      key={column.id}
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={columnVisibility[column.id] !== false}
+                        onChange={() => {
+                          toggleColumnVisibility(column.id);
+                          const menu = document.getElementById('column-visibility-menu');
+                          if (menu) menu.style.display = 'none';
+                        }}
+                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+                      />
+                      <span className="text-sm text-slate-700 font-medium">{column.label}</span>
+                    </label>
+                  ))}
                 </div>
-                {columnDefinitions.map((column) => (
-                  <label
-                    key={column.id}
-                    className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={columnVisibility[column.id] !== false}
-                      onChange={() => {
-                        toggleColumnVisibility(column.id);
-                        const menu = document.getElementById('column-visibility-menu');
-                        if (menu) menu.style.display = 'none';
-                      }}
-                      className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
-                    />
-                    <span className="text-sm text-slate-700 font-medium">{column.label}</span>
-                  </label>
-                ))}
               </div>
             </div>
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => {
-                // Toggle table settings menu
-                const menu = document.getElementById('table-settings-menu');
-                if (menu) {
-                  menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-                }
-              }}
-              className="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
-              title="Table Settings"
-              aria-label="Table Settings"
-            >
-              <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-            <div
-              id="table-settings-menu"
-              className="hidden absolute right-0 sm:right-0 left-auto sm:left-auto top-full mt-1 bg-white border border-slate-300 rounded shadow-lg z-50 min-w-[200px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-200px)] overflow-y-auto"
-            >
-              <div className="p-2">
-                <div className="px-3 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 bg-slate-50 mb-1">
-                  Table Settings
-                </div>
-                <div className="px-2 py-1 text-xs font-semibold text-slate-700 border-b border-slate-200 mb-1">
-                  Freeze Columns
-                </div>
-                <button
-                  onClick={() => {
-                    setFreezeColumnId(null);
-                    const menu = document.getElementById('table-settings-menu');
-                    if (menu) menu.style.display = 'none';
-                  }}
-                  className={`w-full text-left px-2 py-1.5 text-xs rounded hover:bg-slate-100 ${!freezeColumnId ? 'bg-slate-100 font-medium' : ''}`}
-                >
-                  None
-                </button>
-                {columnDefinitions.map((col) => (
+            <div className="relative">
+              <button
+                onClick={() => {
+                  // Toggle table settings menu
+                  const menu = document.getElementById('table-settings-menu');
+                  if (menu) {
+                    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+                  }
+                }}
+                className="p-2.5 sm:p-1.5 hover:bg-slate-100 active:bg-slate-200 rounded-full border border-slate-300 transition-colors relative min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center touch-target"
+                title="Table Settings"
+                aria-label="Table Settings"
+              >
+                <svg className="h-4 w-4 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+              <div
+                id="table-settings-menu"
+                className="hidden absolute right-0 sm:right-0 left-auto sm:left-auto top-full mt-1 bg-white border border-slate-300 rounded shadow-lg z-50 min-w-[200px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-200px)] overflow-y-auto"
+              >
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider border-b border-slate-200 bg-slate-50 mb-1">
+                    Table Settings
+                  </div>
+                  <div className="px-2 py-1 text-xs font-semibold text-slate-700 border-b border-slate-200 mb-1">
+                    Freeze Columns
+                  </div>
                   <button
-                    key={col.id}
                     onClick={() => {
-                      setFreezeColumnId(col.id);
+                      setFreezeColumnId(null);
                       const menu = document.getElementById('table-settings-menu');
                       if (menu) menu.style.display = 'none';
                     }}
-                    className={`w-full text-left px-2 py-1.5 text-xs rounded hover:bg-slate-100 ${freezeColumnId === col.id ? 'bg-slate-100 font-medium' : ''}`}
+                    className={`w-full text-left px-2 py-1.5 text-xs rounded hover:bg-slate-100 ${!freezeColumnId ? 'bg-slate-100 font-medium' : ''}`}
                   >
-                    Before {col.label}
+                    None
                   </button>
-                ))}
-                <div className="border-t border-slate-200 my-1"></div>
-                <button
-                  onClick={() => {
-                    // Reset all table settings
-                    setSorting([]);
-                    setGlobalFilter("");
-                    setFreezeColumnId(null);
-                    setColumnVisibility({});
-                    const menu = document.getElementById('table-settings-menu');
-                    if (menu) menu.style.display = 'none';
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded transition-colors"
-                >
-                  Reset All Settings
-                </button>
-                <button
-                  onClick={() => {
-                    // Show all columns
-                    setColumnVisibility({});
-                    const menu = document.getElementById('table-settings-menu');
-                    if (menu) menu.style.display = 'none';
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded transition-colors"
-                >
-                  Show All Columns
-                </button>
-                <button
-                  onClick={() => {
-                    // Hide all supplier columns except first one
-                    const supplierColumns = columnDefinitions.filter(col =>
-                      col.id.includes('Supplier') && col.id !== 'Supplier 1 (Rate)'
-                    );
-                    const newVisibility: VisibilityState = {};
-                    supplierColumns.forEach(col => {
-                      newVisibility[col.id] = false;
-                    });
-                    setColumnVisibility(newVisibility);
-                    const menu = document.getElementById('table-settings-menu');
-                    if (menu) menu.style.display = 'none';
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded transition-colors"
-                >
-                  Show Only First Supplier
-                </button>
-                <div className="border-t border-slate-200 my-1"></div>
-                <div className="px-3 py-2 text-xs text-slate-600">
-                  <div className="font-medium mb-1">Current Status:</div>
-                  <div className="text-xs space-y-0.5">
-                    <div>Rows: {table.getRowModel().rows.length} of {data.length}</div>
-                    <div>Sorting: {sorting.length > 0 ? `${sorting.length} column(s)` : 'None'}</div>
-                    <div>Frozen: {freezeColumnId ? 'Yes' : 'No'}</div>
-                    <div>Hidden: {Object.values(columnVisibility).filter(v => v === false).length} column(s)</div>
+                  {columnDefinitions.map((col) => (
+                    <button
+                      key={col.id}
+                      onClick={() => {
+                        setFreezeColumnId(col.id);
+                        const menu = document.getElementById('table-settings-menu');
+                        if (menu) menu.style.display = 'none';
+                      }}
+                      className={`w-full text-left px-2 py-1.5 text-xs rounded hover:bg-slate-100 ${freezeColumnId === col.id ? 'bg-slate-100 font-medium' : ''}`}
+                    >
+                      Before {col.label}
+                    </button>
+                  ))}
+                  <div className="border-t border-slate-200 my-1"></div>
+                  <button
+                    onClick={() => {
+                      // Reset all table settings
+                      setSorting([]);
+                      setGlobalFilter("");
+                      setFreezeColumnId(null);
+                      setColumnVisibility({});
+                      const menu = document.getElementById('table-settings-menu');
+                      if (menu) menu.style.display = 'none';
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded transition-colors"
+                  >
+                    Reset All Settings
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Show all columns
+                      setColumnVisibility({});
+                      const menu = document.getElementById('table-settings-menu');
+                      if (menu) menu.style.display = 'none';
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded transition-colors"
+                  >
+                    Show All Columns
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Hide all supplier columns except first one
+                      const supplierColumns = columnDefinitions.filter(col =>
+                        col.id.includes('Supplier') && col.id !== 'Supplier 1 (Rate)'
+                      );
+                      const newVisibility: VisibilityState = {};
+                      supplierColumns.forEach(col => {
+                        newVisibility[col.id] = false;
+                      });
+                      setColumnVisibility(newVisibility);
+                      const menu = document.getElementById('table-settings-menu');
+                      if (menu) menu.style.display = 'none';
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded transition-colors"
+                  >
+                    Show Only First Supplier
+                  </button>
+                  <div className="border-t border-slate-200 my-1"></div>
+                  <div className="px-3 py-2 text-xs text-slate-600">
+                    <div className="font-medium mb-1">Current Status:</div>
+                    <div className="text-xs space-y-0.5">
+                      <div>Rows: {table.getRowModel().rows.length} of {data.length}</div>
+                      <div>Sorting: {sorting.length > 0 ? `${sorting.length} column(s)` : 'None'}</div>
+                      <div>Frozen: {freezeColumnId ? 'Yes' : 'No'}</div>
+                      <div>Hidden: {Object.values(columnVisibility).filter(v => v === false).length} column(s)</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        {showOptimization && (
+          <div className="p-4 bg-slate-50 border-b border-slate-200">
+            <OptimizationSummary data={filteredData} />
+          </div>
+        )}
         <div className={`scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 ${showTreeView ? 'overflow-auto max-h-[calc(100vh-200px)] sm:max-h-[calc(100vh-250px)] rounded-b-lg' : 'overflow-x-auto -mx-1 sm:mx-0'}`}>
           <table ref={tableRef} className="w-full border-separate border-spacing-0 min-w-full">
             <thead className="bg-slate-50 sticky top-0 z-20">
@@ -706,7 +842,7 @@ export function BomTable({ data }: BomTableProps) {
                       if (isSupplierColumn && !isFrozen) {
                         const supplierKey = cell.column.id as SupplierRateKey;
                         const supplierValue = rowData.suppliers[supplierKey];
-                        const heatmapColor = calculateHeatmapColor(supplierValue, rowData);
+                        const heatmapColor = calculateHeatmapColor(supplierValue, rowData, heatmapStrategy);
                         cellBackgroundColor = heatmapColor.backgroundColor;
                       } else if (isFrozen) {
                         cellBackgroundColor = idx % 2 === 0 ? "#ffffff" : "#f8fafc";
@@ -833,6 +969,6 @@ export function BomTable({ data }: BomTableProps) {
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 }
