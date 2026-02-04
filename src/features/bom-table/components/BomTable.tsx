@@ -422,6 +422,23 @@ export function BomTable({ data }: BomTableProps) {
     );
   }, [displayData, globalFilter]);
 
+  // Derived data for Optimization Summary
+  // We uses effectiveData (which contains all leaf nodes/items) + filter logic
+  // to ensure we calculate optimization on ALL relevant items, not just the visible ones (expanded/collapsed).
+  const optimizationData = useMemo(() => {
+    if (!globalFilter) return effectiveData;
+    const filter = globalFilter.toLowerCase();
+    return effectiveData.filter(
+      (row) =>
+        row.itemCode.toLowerCase().includes(filter) ||
+        row.material.toLowerCase().includes(filter) ||
+        row.category?.toLowerCase().includes(filter) ||
+        row.subCategory1?.toLowerCase().includes(filter) ||
+        row.subCategory2?.toLowerCase().includes(filter) ||
+        row.description?.toLowerCase().includes(filter)
+    );
+  }, [effectiveData, globalFilter]);
+
   const table = useReactTable({
     data: filteredData,
     columns,
@@ -767,7 +784,7 @@ export function BomTable({ data }: BomTableProps) {
 
         {showOptimization && (
           <div className="p-4 bg-slate-50 border-b border-slate-200">
-            <OptimizationSummary data={filteredData} />
+            <OptimizationSummary data={optimizationData} />
           </div>
         )}
         <div className={`scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 ${showTreeView ? 'overflow-auto max-h-[calc(100vh-200px)] sm:max-h-[calc(100vh-250px)] rounded-b-lg' : 'overflow-x-auto -mx-1 sm:mx-0'}`}>

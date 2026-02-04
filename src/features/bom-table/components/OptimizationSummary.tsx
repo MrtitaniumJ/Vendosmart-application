@@ -12,10 +12,7 @@ export function OptimizationSummary({ data }: OptimizationSummaryProps) {
         let totalEstimatedAmount = 0;
 
         data.forEach((row) => {
-            // Skip parent/group nodes to avoid double counting
-            if ((row as any).children && (row as any).children.length > 0) {
-                return;
-            }
+
 
             const quantity = row.quantity || 0;
 
